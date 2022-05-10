@@ -43,7 +43,7 @@ unsigned int get_grid_size(unsigned int dataSize, unsigned int maxElementsPerBlo
     return gridSize;
 }
 
-unsigned int sum_gpu(const unsigned int *deviceDataIn, const unsigned int dataSize, const unsigned int threadsCount, void (*reduce)(unsigned int*, const unsigned int*, unsigned int)) {
+unsigned int sum_gpu(const unsigned int *deviceDataIn, const unsigned int dataSize, const int threadsCount, void (*reduce)(unsigned int*, const unsigned int*, unsigned int, int)) {
     // wartość globalna sumy
     unsigned int totalSum = 0;
 
@@ -60,7 +60,7 @@ unsigned int sum_gpu(const unsigned int *deviceDataIn, const unsigned int dataSi
     checkCudaErrors(cudaMemset(deviceBlockSums, 0, sizeof(unsigned int) * gridSize));
 
     // zsumuj dane przypisane do kolejnych bloków
-    reduce<<<gridSize, BLOCK_SIZE, sizeof(unsigned int) * BLOCK_SIZE>>>(deviceBlockSums, deviceDataIn, dataSize);
+    reduce<<<gridSize, BLOCK_SIZE, sizeof(unsigned int) * BLOCK_SIZE>>>(deviceBlockSums, deviceDataIn, dataSize, threadsCount);
 
     // zsumuj kolejne bloki pamięci w celu uzyskania globalnej sumy
     // w przypadku ilości bloków mniejszej niż 2048 wykorzystaj redukcję do określenia globalnej sumy
@@ -69,7 +69,7 @@ unsigned int sum_gpu(const unsigned int *deviceDataIn, const unsigned int dataSi
         unsigned int *deviceTotalSum;
         checkCudaErrors(cudaMalloc(&deviceTotalSum, sizeof(unsigned int)));
         checkCudaErrors(cudaMemset(deviceTotalSum, 0, sizeof(unsigned int)));
-        reduce<<<1, BLOCK_SIZE, sizeof(unsigned int) * BLOCK_SIZE>>>(deviceTotalSum, deviceBlockSums, gridSize);
+        reduce<<<1, BLOCK_SIZE, sizeof(unsigned int) * BLOCK_SIZE>>>(deviceTotalSum, deviceBlockSums, gridSize, threadsCount);
         checkCudaErrors(cudaMemcpy(&totalSum, deviceTotalSum, sizeof(unsigned int), cudaMemcpyDeviceToHost));
         checkCudaErrors(cudaFree(deviceTotalSum));
     } else {
@@ -160,13 +160,13 @@ int main(int argc, char **argv) {
     checkCudaErrors(cudaMalloc(&deviceDataIn, sizeof(unsigned int) * dataSize));
     checkCudaErrors(cudaMemcpy(deviceDataIn, dataIn, sizeof(unsigned int) * dataSize, cudaMemcpyHostToDevice));
 
-    vector<void (*)(unsigned int*, const unsigned int*, unsigned int)> reductions = {
+    vector<void (*)(unsigned int*, const unsigned int*, unsigned int, int)> reductions = {
             reduce_0,
             reduce_1,
             reduce_2,
             reduce_3,
             reduce_4,
-            reduce_5<BLOCK_SIZE>,
+            reduce_5,
             reduce_shuffle,
     };
 
