@@ -11,7 +11,6 @@
 #include "mandelbrot.cu"
 
 #define NUMBER double
-#define BLOCK_SIZE 512
 #define SAMPLE_SIZE 11
 
 using namespace std;
@@ -119,14 +118,14 @@ NUMBER standard_deviation(const NUMBER *data, int length, NUMBER meanValue) {
     return result;
 }
 
-inline NUMBER round(NUMBER val) {
-    double fullValuePart = val * 1000.0;
+inline NUMBER round3(NUMBER val) {
+    NUMBER fullValuePart = val * (NUMBER) 1000.0;
 
     fullValuePart = fullValuePart < 0
-            ? ceil(fullValuePart - 0.5)
-            : floor(fullValuePart + 0.5);
+            ? ceil(fullValuePart - (NUMBER) 0.5)
+            : floor(fullValuePart + (NUMBER) 0.5);
 
-    return fullValuePart / 1000.0;
+    return fullValuePart / (NUMBER) 1000.0;
 }
 
 int main(int argc, char **argv) {
@@ -201,7 +200,7 @@ int main(int argc, char **argv) {
             NUMBER meanResult = mean(sample, SAMPLE_SIZE);
             NUMBER sdResult = standard_deviation(sample, SAMPLE_SIZE, meanResult);
 
-            cout << round(medianResult) << " (+/- " << round(sdResult) << "); ";
+            cout << round3(medianResult) << " (+/- " << round3(sdResult) << "); ";
         }
 
         cout << reductionResult << "; " << endl;
@@ -236,7 +235,7 @@ int main(int argc, char **argv) {
             NUMBER meanResult = mean(sample, SAMPLE_SIZE);
             NUMBER sdResult = standard_deviation(sample, SAMPLE_SIZE, meanResult);
 
-            cout << round(medianResult) << " (+/- " << round(sdResult) << "); ";
+            cout << round3(medianResult) << " (+/- " << round3(sdResult) << "); ";
         }
 
         cout << endl;
