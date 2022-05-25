@@ -8,7 +8,7 @@
 using namespace std;
 
 template<typename NUMBER>
-__global__ void cuda_mandelbrot(NUMBER x0, NUMBER y0, NUMBER x1, NUMBER y1, int width, int height, unsigned int *dataOut) {
+__global__ void cuda_mandelbrot(NUMBER x0, NUMBER y0, NUMBER x1, NUMBER y1, int width, int height, int *dataOut) {
     int i;
     int threadId = int(threadIdx.x + blockIdx.x * blockDim.x);
     int size = height * width;
@@ -39,21 +39,21 @@ __global__ void cuda_mandelbrot(NUMBER x0, NUMBER y0, NUMBER x1, NUMBER y1, int 
 }
 
 template<typename NUMBER>
-__host__ unsigned int *calculate_mandelbrot_data(const unsigned int width, const unsigned int height) {
+__host__ int *calculate_mandelbrot_data(const int width, const int height) {
     const NUMBER x0 = -0.82;
     const NUMBER y0 = 0.1;
     const NUMBER x1 = -0.7;
     const NUMBER y1 = 0.22;
 
     // wylicz rozmiar macierzy wynikowej
-    unsigned int size = width * height;
+    int size = width * height;
 
     // zalokuj pamiec na cpu
-    auto *mandelDataHost = new unsigned int[size];
+    auto *mandelDataHost = new int[size];
 
     // zalokuj pamiec na gpu
-    unsigned int *mandelDataDevice;
-    cudaMalloc(&mandelDataDevice, size * sizeof(unsigned int));
+    int *mandelDataDevice;
+    cudaMalloc(&mandelDataDevice, size * sizeof(int));
 
     // wykonaj generowanie mandelbrota
     for (int currentThreadsCount = 32; currentThreadsCount < 2048; currentThreadsCount = 2 * currentThreadsCount) {
@@ -68,7 +68,7 @@ __host__ unsigned int *calculate_mandelbrot_data(const unsigned int width, const
     }
 
     // wczytaj wyliczone dane z cuda do pamieci komputera
-    cudaMemcpy(mandelDataHost, mandelDataDevice, size * sizeof(unsigned int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(mandelDataHost, mandelDataDevice, size * sizeof(int), cudaMemcpyDeviceToHost);
 
     // usun
     cudaFree(&mandelDataDevice);

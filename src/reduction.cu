@@ -1,9 +1,13 @@
 #ifndef REDUCTION_METHODS
 #define REDUCTION_METHODS
 
-extern __shared__ volatile unsigned int sharedSumData[];
+#include <cooperative_groups.h>
 
-__global__ void reduce_0(unsigned int *dataOut, const unsigned int *dataIn, unsigned int dataSize, int threadsCount) {
+using namespace cooperative_groups;
+
+extern __shared__ volatile int sharedSumData[];
+
+__global__ void reduce_0(int *dataOut, const int *dataIn, int dataSize, int threadsCount) {
     unsigned int threadId = threadIdx.x;
     unsigned int threadLocation = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -15,7 +19,7 @@ __global__ void reduce_0(unsigned int *dataOut, const unsigned int *dataIn, unsi
 
     __syncthreads();
 
-    for (unsigned int stepValue = 1; stepValue < blockDim.x; stepValue *= 2) {
+    for (int stepValue = 1; stepValue < blockDim.x; stepValue *= 2) {
         if (threadId % (2 * stepValue) == 0) {
             sharedSumData[threadId] += sharedSumData[threadId + stepValue];
         }
@@ -27,7 +31,7 @@ __global__ void reduce_0(unsigned int *dataOut, const unsigned int *dataIn, unsi
     }
 }
 
-__global__ void reduce_1(unsigned int *dataOut, const unsigned int *dataIn, unsigned int dataSize, int threadsCount) {
+__global__ void reduce_1(int *dataOut, const int *dataIn, int dataSize, int threadsCount) {
     unsigned int threadId = threadIdx.x;
     unsigned int threadLocation = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -39,8 +43,8 @@ __global__ void reduce_1(unsigned int *dataOut, const unsigned int *dataIn, unsi
 
     __syncthreads();
 
-    for (unsigned int stepValue = 1; stepValue < blockDim.x; stepValue *= 2) {
-        unsigned int index = 2 * stepValue * threadId;
+    for (int stepValue = 1; stepValue < blockDim.x; stepValue *= 2) {
+        int index = 2 * stepValue * threadId;
 
         if (index < blockDim.x) {
             sharedSumData[index] += sharedSumData[index + stepValue];
@@ -54,7 +58,7 @@ __global__ void reduce_1(unsigned int *dataOut, const unsigned int *dataIn, unsi
     }
 }
 
-__global__ void reduce_2(unsigned int *dataOut, const unsigned int *dataIn, unsigned int dataSize, int threadsCount) {
+__global__ void reduce_2(int *dataOut, const int *dataIn, int dataSize, int threadsCount) {
     unsigned int threadId = threadIdx.x;
     unsigned int threadLocation = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -79,7 +83,7 @@ __global__ void reduce_2(unsigned int *dataOut, const unsigned int *dataIn, unsi
     }
 }
 
-__global__ void reduce_3(unsigned int *dataOut, const unsigned int *dataIn, unsigned int dataSize, int threadsCount) {
+__global__ void reduce_3(int *dataOut, const int *dataIn, int dataSize, int threadsCount) {
     unsigned int threadId = threadIdx.x;
     unsigned int threadLocation = blockIdx.x * (blockDim.x * 2) + threadIdx.x;
 
@@ -103,7 +107,7 @@ __global__ void reduce_3(unsigned int *dataOut, const unsigned int *dataIn, unsi
     }
 }
 
-__global__ void reduce_4(unsigned int *dataOut, const unsigned int *dataIn, unsigned int dataSize, int threadsCount) {
+__global__ void reduce_4(int *dataOut, const int *dataIn, int dataSize, int threadsCount) {
     unsigned int threadId = threadIdx.x;
     unsigned int threadLocation = blockIdx.x * (blockDim.x * 2) + threadIdx.x;
 
@@ -138,7 +142,7 @@ __global__ void reduce_4(unsigned int *dataOut, const unsigned int *dataIn, unsi
     }
 }
 
-__global__ void reduce_5(unsigned int *dataOut, const unsigned int *dataIn, unsigned int dataSize, int threadsCount) {
+__global__ void reduce_5(int *dataOut, const int *dataIn, int dataSize, int threadsCount) {
     unsigned int threadId = threadIdx.x;
     unsigned int threadLocation = threadIdx.x + blockIdx.x * (blockDim.x * 2);
 
@@ -205,42 +209,40 @@ __global__ void reduce_5(unsigned int *dataOut, const unsigned int *dataIn, unsi
     }
 }
 
-__global__ void reduce_shuffle(unsigned int *dataOut, const unsigned int *dataIn, unsigned int dataSize, int threadsCount) {
+__global__ void reduce_shuffle(int *dataOut, const int *dataIn, int dataSize, int threadsCount) {
     unsigned int threadId = threadIdx.x;
     unsigned int threadLocation = threadIdx.x + blockDim.x * blockIdx.x;
-    unsigned int valueFromSharedMemory = 0.0f;
-
-    unsigned mask = 0xFFFFFFFFU;
-
+    const unsigned mask = 0xFFFFFFFFU;
     unsigned int lane = threadIdx.x % warpSize;
     unsigned int warpId = threadIdx.x / warpSize;
+    int value = 0;
 
     while (threadLocation < dataSize) {
-        valueFromSharedMemory += dataIn[threadLocation];
+        value += dataIn[threadLocation];
         threadLocation += gridDim.x * blockDim.x;
     }
 
     for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
-        valueFromSharedMemory += __shfl_down_sync(mask, valueFromSharedMemory, offset);
+        value += __shfl_down_sync(mask, value, offset);
     }
 
     if (lane == 0) {
-        sharedSumData[warpId] = valueFromSharedMemory;
+        sharedSumData[warpId] = value;
     }
 
     __syncthreads();
 
     if (warpId == 0) {
-        valueFromSharedMemory = (threadId < blockDim.x / warpSize)
+        value = (threadId < blockDim.x / warpSize)
                 ? sharedSumData[lane]
                 : 0;
 
         for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
-            valueFromSharedMemory += __shfl_down_sync(mask, valueFromSharedMemory, offset);
+            value += __shfl_down_sync(mask, value, offset);
         }
 
         if (threadId == 0) {
-            atomicAdd(reinterpret_cast<unsigned int *>(dataOut), valueFromSharedMemory);
+            atomicAdd(reinterpret_cast<int *>(dataOut), value);
         }
     }
 }
